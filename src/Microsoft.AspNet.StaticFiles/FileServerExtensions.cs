@@ -16,45 +16,45 @@ namespace Microsoft.AspNet.Builder
         /// <summary>
         /// Enable all static file middleware (except directory browsing) for the current request path in the current directory.
         /// </summary>
-        /// <param name="builder"></param>
+        /// <param name="app"></param>
         /// <returns></returns>
-        public static IApplicationBuilder UseFileServer(this IApplicationBuilder builder)
+        public static IApplicationBuilder UseFileServer(this IApplicationBuilder app)
         {
-            if (builder == null)
+            if (app == null)
             {
-                throw new ArgumentNullException(nameof(builder));
+                throw new ArgumentNullException(nameof(app));
             }
 
-            return builder.UseFileServer(new FileServerOptions());
+            return app.UseFileServer(options => { });
         }
 
         /// <summary>
         /// Enable all static file middleware on for the current request path in the current directory.
         /// </summary>
-        /// <param name="builder"></param>
+        /// <param name="app"></param>
         /// <param name="enableDirectoryBrowsing">Should directory browsing be enabled?</param>
         /// <returns></returns>
-        public static IApplicationBuilder UseFileServer(this IApplicationBuilder builder, bool enableDirectoryBrowsing)
+        public static IApplicationBuilder UseFileServer(this IApplicationBuilder app, bool enableDirectoryBrowsing)
         {
-            if (builder == null)
+            if (app == null)
             {
-                throw new ArgumentNullException(nameof(builder));
+                throw new ArgumentNullException(nameof(app));
             }
 
-            return builder.UseFileServer(new FileServerOptions() { EnableDirectoryBrowsing = enableDirectoryBrowsing });
+            return app.UseFileServer(options => { options.EnableDirectoryBrowsing = enableDirectoryBrowsing; });
         }
 
         /// <summary>
         /// Enables all static file middleware (except directory browsing) for the given request path from the directory of the same name
         /// </summary>
-        /// <param name="builder"></param>
+        /// <param name="app"></param>
         /// <param name="requestPath">The relative request path.</param>
         /// <returns></returns>
-        public static IApplicationBuilder UseFileServer(this IApplicationBuilder builder, string requestPath)
+        public static IApplicationBuilder UseFileServer(this IApplicationBuilder app, string requestPath)
         {
-            if (builder == null)
+            if (app == null)
             {
-                throw new ArgumentNullException(nameof(builder));
+                throw new ArgumentNullException(nameof(app));
             }
 
             if (requestPath == null)
@@ -62,27 +62,54 @@ namespace Microsoft.AspNet.Builder
                 throw new ArgumentNullException(nameof(requestPath));
             }
 
-            return builder.UseFileServer(new FileServerOptions() { RequestPath = new PathString(requestPath) });
+            return app.UseFileServer(options => { options.RequestPath = new PathString(requestPath); });
         }
 
         /// <summary>
         /// Enable all static file middleware with the given options
         /// </summary>
-        /// <param name="builder"></param>
+        /// <param name="app"></param>
+        /// <param name="configureOptions"></param>
+        /// <returns></returns>
+        public static IApplicationBuilder UseFileServer(this IApplicationBuilder app, Action<FileServerOptions> configureOptions)
+        {
+            if (app == null)
+            {
+                throw new ArgumentNullException(nameof(app));
+            }
+            if (configureOptions == null)
+            {
+                throw new ArgumentNullException(nameof(configureOptions));
+            }
+
+            var fileServerOptions = new FileServerOptions();
+            configureOptions(fileServerOptions);
+
+            if (fileServerOptions.EnableDefaultFiles)
+            {
+                app = app.UseDefaultFiles(options => { options = fileServerOptions.DefaultFilesOptions; });
+            }
+
+            if (fileServerOptions.EnableDirectoryBrowsing)
+            {
+                app = app.UseDirectoryBrowser(options => { options = fileServerOptions.DirectoryBrowserOptions; });
+            }
+
+            return app.UseStaticFiles(options => { options = fileServerOptions.StaticFileOptions; });
+        }
+
+        /// <summary>
+        /// Enable all static file middleware with the given options
+        /// </summary>
+        /// <param name="app"></param>
         /// <param name="options"></param>
         /// <returns></returns>
-        public static IApplicationBuilder UseFileServer(this IApplicationBuilder builder, FileServerOptions options)
+        public static IApplicationBuilder UseFileServer(this IApplicationBuilder app, FileServerOptions options)
         {
-            if (builder == null)
+            if (app == null)
             {
-                throw new ArgumentNullException(nameof(builder));
+                throw new ArgumentNullException(nameof(app));
             }
-
-            if (options == null)
-            {
-                throw new ArgumentNullException(nameof(options));
-            }
-
             if (options == null)
             {
                 throw new ArgumentNullException(nameof(options));
@@ -90,17 +117,15 @@ namespace Microsoft.AspNet.Builder
 
             if (options.EnableDefaultFiles)
             {
-                builder = builder.UseDefaultFiles(options.DefaultFilesOptions);
+                app = app.UseDefaultFiles(options.DefaultFilesOptions);
             }
 
             if (options.EnableDirectoryBrowsing)
             {
-                builder = builder.UseDirectoryBrowser(options.DirectoryBrowserOptions);
+                app = app.UseDirectoryBrowser(options.DirectoryBrowserOptions);
             }
 
-            return builder
-                .UseSendFileFallback()
-                .UseStaticFiles(options.StaticFileOptions);
+            return app.UseStaticFiles(options.StaticFileOptions);
         }
     }
 }

@@ -1,8 +1,7 @@
 using Microsoft.AspNet.Builder;
-using Microsoft.AspNet.StaticFiles;
+using Microsoft.AspNet.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Console;
 
 namespace StaticFilesSample
 {
@@ -16,12 +15,22 @@ namespace StaticFilesSample
         public void Configure(IApplicationBuilder app, ILoggerFactory factory)
         {
             // Displays all log levels
-            factory.AddConsole(LogLevel.Verbose);
+            factory.AddConsole(LogLevel.Debug);
 
-            app.UseFileServer(new FileServerOptions()
+            app.UseFileServer(options =>
             {
-                EnableDirectoryBrowsing = true,
+                options.EnableDirectoryBrowsing = true;
             });
+        }
+
+        public static void Main(string[] args)
+        {
+            var application = new WebApplicationBuilder()
+                .UseConfiguration(WebApplicationConfiguration.GetDefault(args))
+                .UseStartup<Startup>()
+                .Build();
+
+            application.Run();
         }
     }
 }

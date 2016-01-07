@@ -6,10 +6,11 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Threading.Tasks;
 using Microsoft.AspNet.FileProviders;
 using Microsoft.AspNet.Http;
-using Microsoft.Extensions.WebEncoders;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Microsoft.AspNet.StaticFiles
 {
@@ -20,7 +21,7 @@ namespace Microsoft.AspNet.StaticFiles
     {
         private const string TextHtmlUtf8 = "text/html; charset=utf-8";
 
-        private static IHtmlEncoder _htmlEncoder;
+        private HtmlEncoder _htmlEncoder;
 
         /// <summary>
         /// Generates an HTML view for a directory.
@@ -38,7 +39,7 @@ namespace Microsoft.AspNet.StaticFiles
 
             if (_htmlEncoder == null)
             {
-                _htmlEncoder = context.ApplicationServices.GetHtmlEncoder();
+                _htmlEncoder = context.RequestServices.GetRequiredService<HtmlEncoder>();
             }
 
             context.Response.ContentType = TextHtmlUtf8;
@@ -159,9 +160,9 @@ namespace Microsoft.AspNet.StaticFiles
             return context.Response.Body.WriteAsync(bytes, 0, bytes.Length);
         }
 
-        private static string HtmlEncode(string body)
+        private string HtmlEncode(string body)
         {
-            return _htmlEncoder.HtmlEncode(body);
+            return _htmlEncoder.Encode(body);
         }
     }
 }

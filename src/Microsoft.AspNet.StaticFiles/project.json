@@ -10,11 +10,20 @@
     "url": "git://github.com/aspnet/staticfiles"
   },
   "dependencies": {
+<<<<<<< HEAD
     "Microsoft.AspNet.Http.Extensions": "1.0.0-rc1-final",
     "Microsoft.AspNet.FileProviders.Abstractions": "1.0.0-rc1-final",
     "Microsoft.AspNet.Hosting.Abstractions": "1.0.0-rc1-final",
     "Microsoft.Extensions.Logging.Abstractions": "1.0.0-rc1-final",
     "Microsoft.Extensions.WebEncoders": "1.0.0-rc1-final"
+=======
+    "Microsoft.AspNet.Http.Extensions": "1.0.0-*",
+    "Microsoft.AspNet.FileProviders.Abstractions": "1.0.0-*",
+    "Microsoft.AspNet.Hosting.Abstractions": "1.0.0-*",
+    "Microsoft.Extensions.Logging.Abstractions": "1.0.0-*",
+    "Microsoft.Extensions.WebEncoders": "1.0.0-*",
+    "System.Buffers": "4.0.0-*"
+>>>>>>> refs/remotes/aspnet/dev
   },
   "frameworks": {
     "net451": {},

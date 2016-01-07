@@ -11,6 +11,7 @@ using Microsoft.AspNet.Builder;
 using Microsoft.AspNet.FileProviders;
 using Microsoft.AspNet.Http;
 using Microsoft.AspNet.TestHost;
+using Microsoft.AspNet.Testing.xunit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -21,17 +22,17 @@ namespace Microsoft.AspNet.StaticFiles
         [Fact]
         public async Task NullArguments()
         {
-            Assert.Throws<ArgumentException>(() => TestServer.Create(
-                app => app.UseDirectoryBrowser(new DirectoryBrowserOptions() { Formatter = null }),
+            Assert.Throws<ArgumentException>(() => StaticFilesTestServer.Create(
+                app => app.UseDirectoryBrowser(options => { options.Formatter = null; }),
             services => services.AddDirectoryBrowser()));
 
             // No exception, default provided
-            TestServer.Create(
-                app => app.UseDirectoryBrowser(new DirectoryBrowserOptions() { FileProvider = null }),
+            StaticFilesTestServer.Create(
+                app => app.UseDirectoryBrowser(options => { options.FileProvider = null; }),
                 services => services.AddDirectoryBrowser());
 
             // PathString(null) is OK.
-            TestServer server = TestServer.Create(
+            var server = StaticFilesTestServer.Create(
                 app => app.UseDirectoryBrowser((string)null),
                 services => services.AddDirectoryBrowser());
 
@@ -45,17 +46,35 @@ namespace Microsoft.AspNet.StaticFiles
         [InlineData("/subdir", @".", "/subdir/missing.dir")]
         [InlineData("/subdir", @".", "/subdir/missing.dir/")]
         [InlineData("", @"./", "/missing.dir")]
+        public async Task NoMatch_PassesThrough_All(string baseUrl, string baseDir, string requestUrl)
+        {
+            await NoMatch_PassesThrough(baseUrl, baseDir, requestUrl);
+        }
+
+        [ConditionalTheory]
+        [OSSkipCondition(OperatingSystems.Linux)]
+        [OSSkipCondition(OperatingSystems.MacOSX)]
+        [InlineData("", @".\", "/missing.dir")]
+        [InlineData("", @".\", "/Missing.dir")]
+        public async Task NoMatch_PassesThrough_Windows(string baseUrl, string baseDir, string requestUrl)
+        {
+            await NoMatch_PassesThrough(baseUrl, baseDir, requestUrl);
+        }
+
         public async Task NoMatch_PassesThrough(string baseUrl, string baseDir, string requestUrl)
         {
-            TestServer server = TestServer.Create(
-                app => app.UseDirectoryBrowser(new DirectoryBrowserOptions()
-                {
-                    RequestPath = new PathString(baseUrl),
-                    FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), baseDir))
-                }),
-                services => services.AddDirectoryBrowser());
-            HttpResponseMessage response = await server.CreateRequest(requestUrl).GetAsync();
-            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+            using (var fileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), baseDir)))
+            {
+                var server = StaticFilesTestServer.Create(
+                    app => app.UseDirectoryBrowser(options =>
+                    {
+                        options.RequestPath = new PathString(baseUrl);
+                        options.FileProvider = fileProvider;
+                    }),
+                    services => services.AddDirectoryBrowser());
+                var response = await server.CreateRequest(requestUrl).GetAsync();
+                Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+            }
         }
 
         [Theory]
@@ -64,21 +83,39 @@ namespace Microsoft.AspNet.StaticFiles
         [InlineData("/somedir", @".", "/somedir/")]
         [InlineData("/somedir", @"./", "/somedir/")]
         [InlineData("/somedir", @".", "/somedir/SubFolder/")]
+        public async Task FoundDirectory_Served_All(string baseUrl, string baseDir, string requestUrl)
+        {
+            await FoundDirectory_Served(baseUrl, baseDir, requestUrl);
+        }
+
+        [ConditionalTheory]
+        [OSSkipCondition(OperatingSystems.Linux)]
+        [OSSkipCondition(OperatingSystems.MacOSX)]
+        [InlineData("/somedir", @".\", "/somedir/")]
+        [InlineData("/somedir", @".", "/somedir/subFolder/")]
+        public async Task FoundDirectory_Served_Windows(string baseUrl, string baseDir, string requestUrl)
+        {
+            await FoundDirectory_Served(baseUrl, baseDir, requestUrl);
+        }
+
         public async Task FoundDirectory_Served(string baseUrl, string baseDir, string requestUrl)
         {
-            TestServer server = TestServer.Create(
-                app => app.UseDirectoryBrowser(new DirectoryBrowserOptions()
-                {
-                    RequestPath = new PathString(baseUrl),
-                    FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), baseDir))
-                }),
-                services => services.AddDirectoryBrowser());
-            HttpResponseMessage response = await server.CreateRequest(requestUrl).GetAsync();
+            using (var fileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), baseDir)))
+            {
+                var server = StaticFilesTestServer.Create(
+                    app => app.UseDirectoryBrowser(options =>
+                    {
+                        options.RequestPath = new PathString(baseUrl);
+                        options.FileProvider = fileProvider;
+                    }),
+                    services => services.AddDirectoryBrowser());
+                var response = await server.CreateRequest(requestUrl).GetAsync();
 
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            Assert.Equal("text/html; charset=utf-8", response.Content.Headers.ContentType.ToString());
-            Assert.True(response.Content.Headers.ContentLength > 0);
-            Assert.Equal(response.Content.Headers.ContentLength, (await response.Content.ReadAsByteArrayAsync()).Length);
+                Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+                Assert.Equal("text/html; charset=utf-8", response.Content.Headers.ContentType.ToString());
+                Assert.True(response.Content.Headers.ContentLength > 0);
+                Assert.Equal(response.Content.Headers.ContentLength, (await response.Content.ReadAsByteArrayAsync()).Length);
+            }
         }
 
         [Theory]
@@ -88,21 +125,39 @@ namespace Microsoft.AspNet.StaticFiles
         [InlineData("", @".", "/SubFolder", "?a=b")]
         [InlineData("/somedir", @".", "/somedir", "?a=b")]
         [InlineData("/somedir", @".", "/somedir/SubFolder", "?a=b")]
+        public async Task NearMatch_RedirectAddSlash_All(string baseUrl, string baseDir, string requestUrl, string queryString)
+        {
+            await NearMatch_RedirectAddSlash(baseUrl, baseDir, requestUrl, queryString);
+        }
+
+        [ConditionalTheory]
+        [OSSkipCondition(OperatingSystems.Linux)]
+        [OSSkipCondition(OperatingSystems.MacOSX)]
+        [InlineData("/somedir", @".", "/somedir/subFolder", "")]
+        [InlineData("/somedir", @".", "/somedir/subFolder", "?a=b")]
+        public async Task NearMatch_RedirectAddSlash_Windows(string baseUrl, string baseDir, string requestUrl, string queryString)
+        {
+            await NearMatch_RedirectAddSlash(baseUrl, baseDir, requestUrl, queryString);
+        }
+
         public async Task NearMatch_RedirectAddSlash(string baseUrl, string baseDir, string requestUrl, string queryString)
         {
-            TestServer server = TestServer.Create(
-                app => app.UseDirectoryBrowser(new DirectoryBrowserOptions()
-                {
-                    RequestPath = new PathString(baseUrl),
-                    FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), baseDir))
-                }),
-                services => services.AddDirectoryBrowser());
+            using (var fileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), baseDir)))
+            {
+                var server = StaticFilesTestServer.Create(
+                    app => app.UseDirectoryBrowser(options =>
+                    {
+                        options.RequestPath = new PathString(baseUrl);
+                        options.FileProvider = fileProvider;
+                    }),
+                    services => services.AddDirectoryBrowser());
 
-            HttpResponseMessage response = await server.CreateRequest(requestUrl + queryString).GetAsync();
+                var response = await server.CreateRequest(requestUrl + queryString).GetAsync();
 
-            Assert.Equal(HttpStatusCode.Moved, response.StatusCode);
-            Assert.Equal(requestUrl + "/" + queryString, response.Headers.GetValues("Location").FirstOrDefault());
-            Assert.Equal(0, (await response.Content.ReadAsByteArrayAsync()).Length);
+                Assert.Equal(HttpStatusCode.Moved, response.StatusCode);
+                Assert.Equal(requestUrl + "/" + queryString, response.Headers.GetValues("Location").FirstOrDefault());
+                Assert.Equal(0, (await response.Content.ReadAsByteArrayAsync()).Length);
+            }
         }
 
         [Theory]
@@ -110,18 +165,35 @@ namespace Microsoft.AspNet.StaticFiles
         [InlineData("", @".", "/SubFolder/")]
         [InlineData("/somedir", @".", "/somedir/")]
         [InlineData("/somedir", @".", "/somedir/SubFolder/")]
+        public async Task PostDirectory_PassesThrough_All(string baseUrl, string baseDir, string requestUrl)
+        {
+            await PostDirectory_PassesThrough(baseUrl, baseDir, requestUrl);
+        }
+
+        [ConditionalTheory]
+        [OSSkipCondition(OperatingSystems.Linux)]
+        [OSSkipCondition(OperatingSystems.MacOSX)]
+        [InlineData("/somedir", @".", "/somedir/subFolder/")]
+        public async Task PostDirectory_PassesThrough_Windows(string baseUrl, string baseDir, string requestUrl)
+        {
+            await PostDirectory_PassesThrough(baseUrl, baseDir, requestUrl);
+        }
+
         public async Task PostDirectory_PassesThrough(string baseUrl, string baseDir, string requestUrl)
         {
-            TestServer server = TestServer.Create(
-                app => app.UseDirectoryBrowser(new DirectoryBrowserOptions()
-                {
-                    RequestPath = new PathString(baseUrl),
-                    FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), baseDir))
-                }),
-                services => services.AddDirectoryBrowser());
+            using (var fileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), baseDir)))
+            {
+                var server = StaticFilesTestServer.Create(
+                    app => app.UseDirectoryBrowser(options =>
+                    {
+                        options.RequestPath = new PathString(baseUrl);
+                        options.FileProvider = fileProvider;
+                    }),
+                    services => services.AddDirectoryBrowser());
 
-            HttpResponseMessage response = await server.CreateRequest(requestUrl).PostAsync();
-            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+                var response = await server.CreateRequest(requestUrl).PostAsync();
+                Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+            }
         }
 
         [Theory]
@@ -129,22 +201,39 @@ namespace Microsoft.AspNet.StaticFiles
         [InlineData("", @".", "/SubFolder/")]
         [InlineData("/somedir", @".", "/somedir/")]
         [InlineData("/somedir", @".", "/somedir/SubFolder/")]
+        public async Task HeadDirectory_HeadersButNotBodyServed_All(string baseUrl, string baseDir, string requestUrl)
+        {
+            await HeadDirectory_HeadersButNotBodyServed(baseUrl, baseDir, requestUrl);
+        }
+
+        [ConditionalTheory]
+        [OSSkipCondition(OperatingSystems.Linux)]
+        [OSSkipCondition(OperatingSystems.MacOSX)]
+        [InlineData("/somedir", @".", "/somedir/subFolder/")]
+        public async Task HeadDirectory_HeadersButNotBodyServed_Windows(string baseUrl, string baseDir, string requestUrl)
+        {
+            await HeadDirectory_HeadersButNotBodyServed(baseUrl, baseDir, requestUrl);
+        }
+
         public async Task HeadDirectory_HeadersButNotBodyServed(string baseUrl, string baseDir, string requestUrl)
         {
-            TestServer server = TestServer.Create(
-                app => app.UseDirectoryBrowser(new DirectoryBrowserOptions()
-                {
-                    RequestPath = new PathString(baseUrl),
-                    FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), baseDir))
-                }),
-                services => services.AddDirectoryBrowser());
+            using (var fileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), baseDir)))
+            {
+                var server = StaticFilesTestServer.Create(
+                    app => app.UseDirectoryBrowser(options =>
+                    {
+                        options.RequestPath = new PathString(baseUrl);
+                        options.FileProvider = fileProvider;
+                    }),
+                    services => services.AddDirectoryBrowser());
 
-            HttpResponseMessage response = await server.CreateRequest(requestUrl).SendAsync("HEAD");
+                var response = await server.CreateRequest(requestUrl).SendAsync("HEAD");
 
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            Assert.Equal("text/html; charset=utf-8", response.Content.Headers.ContentType.ToString());
-            Assert.True(response.Content.Headers.ContentLength == 0);
-            Assert.Equal(0, (await response.Content.ReadAsByteArrayAsync()).Length);
+                Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+                Assert.Equal("text/html; charset=utf-8", response.Content.Headers.ContentType.ToString());
+                Assert.True(response.Content.Headers.ContentLength == 0);
+                Assert.Equal(0, (await response.Content.ReadAsByteArrayAsync()).Length);
+            }
         }
     }
 }
