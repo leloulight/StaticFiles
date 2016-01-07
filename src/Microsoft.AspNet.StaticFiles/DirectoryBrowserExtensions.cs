@@ -25,7 +25,7 @@ namespace Microsoft.AspNet.Builder
                 throw new ArgumentNullException(nameof(app));
             }
 
-            return app.UseDirectoryBrowser(new DirectoryBrowserOptions());
+            return app.UseMiddleware<DirectoryBrowserMiddleware>();
         }
 
         /// <summary>

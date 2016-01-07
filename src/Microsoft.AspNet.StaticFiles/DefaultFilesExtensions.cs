@@ -25,7 +25,7 @@ namespace Microsoft.AspNet.Builder
                 throw new ArgumentNullException(nameof(app));
             }
 
-            return app.UseDefaultFiles(new DefaultFilesOptions());
+            return app.UseMiddleware<DefaultFilesMiddleware>();
         }
 
         /// <summary>

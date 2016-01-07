@@ -25,7 +25,7 @@ namespace Microsoft.AspNet.Builder
                 throw new ArgumentNullException(nameof(app));
             }
 
-            return app.UseStaticFiles(new StaticFileOptions());
+            return app.UseMiddleware<StaticFileMiddleware>();
         }
 
         /// <summary>
